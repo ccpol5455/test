@@ -1,0 +1,279 @@
+shellday05
+
+sed文本编辑器(vim,notepad,world,wps)
+非交互的 逐行处理 默认把文件的所有内容显示一遍
+   
+用法：
+1.前置命令(文件)..... | sed [选项] ‘条件指令’
+2. sed [选项] '条件指令'  文件.....
+
+选项：
+   -n 屏蔽默认输出
+          p:proint 打印
+   #sed -n '3p' /etc/passwd  输出第三行相当于  #head -3 /etc/passwd | tail -1     
+    不加-n,默认sed会输出读取文档的全部内容
+   #sed -n '3,6p' /etc/passwd 输出第三行到第六行  相当于 #head -6 /etc/passwd | tail -4  
+   -r 让sed支持扩展正则
+     sed -r    相当于 grep -E
+
+   -i sed直接删除源文件
+   #sed 'd' /etc/passwd 删除文件全部内容  默认sed只是通过内存临时修改文件，源文件不影响
+   #sed -i 'd' /etc/passwd 删除文件全部内容(真删！！！)
+
+sed允许使用多个指令,指令之间用;（'指令;指令'）
+  sed -n '3p;5p;10p' /etc/passwd
+
+
+sed条件：行号 正则
+ 行号:
+    '3p'     '3p;5p'         '3p,+10p'                                      '1~2p'       
+      第三行   第三行和第五行    第三行以及后面的十行(3-13行总共11行内容)         奇数行(第一行开始每隔两行输出一下)
+          '2～2p'                      
+ 偶数行(第一行开始每隔两行输出一下)
+
+ 正则:要用两个斜线将正则括起来
+   #sed -n '/root/p' /etc/passwd
+   #sed -n '/bash$/p' /etc/passwd
+   #sed -n '/DocumentRoot/p' /etc/httpd/conf/httpd.conf
+
+sed指令:
+  p:打印
+
+ #sed -n 'p' a.txt 全文打一遍
+ #sed -n '4p' a.txt 第四行打印
+ #sed -n '4,+10p' a.txt 打印第四行到第十四行
+ #sed -n '4p;10p' a.txt 打印第四行和第十行
+ #sed -n '/^bin/p' a.txt 打印以/bin 开头的行
+ #sed -n '$=' a.txt 打印文件的行数
+
+  d:删除
+
+ # sed (-i) '3,5d' a.txt   删除第3~5行
+ # sed (-i) '/xml/d' a.txt   删除所有包含xml的行
+ # sed (-i) '/xml/!d' a.txt   删除不包含xml的行，!符号表示取反
+ # sed (-i) '/^install/d' a.txt  删除以install开头的行
+ # sed (-i) '$d' a.txt  删除文件的最后一行
+ # sed (-i) '/^$/d' a.txt  删除所有空行
+  s:替换    如：s/old/new/g(加g全部替换，不加g只替换第一个) 
+  注意：替换操作的分隔“/”可改用其他字符，如#、&等，便于修改文件路径
+
+ # sed 's/xml/XML/' a.txt   将每行中第一个xml替换为XML
+ # sed 's/xml/XML/3' a.txt  将每行中的第3个xml替换为XML
+ # sed 's/xml/XML/g' a.txt  将所有的xml都替换为XML
+ # sed 's/xml//g' a.txt     将所有的xml都删除（替换为空串）(删除某个关键词)
+ # sed 's#/bin/bash#/sbin/sh#' a.txt  将/bin/bash替换为/sbin/sh
+ # sed '4,7s/^/#/' a.txt    将第4~7行注释掉（行首加#号）
+ # sed 's/^#an/an/' a.txt   解除以#an开头的行的注释（去除行首的#号）
+
+测试yum是否可用：
+yum repolist | tail -1 | sed 's/repolist: //g' | sed 's/,//g'
+
+对/etc/passwd文件
+把/bin/bash 替换成 /sbin/sh
+
+#sed 's,/bin/bash,/sbin/sh,' /etc/passwd
+或 #sed 's#/bin/bash#/sbin/sh#' /etc/passwd
+
+#sed 's9\9\98\99\976\99' 文件  
+文件中有内容通过上面的命令变成什么
+      将文件里\9\98\9变成\976\9   分隔符为9
+
+
+#vim 666.txt
+Hello the world
+ni hao ma beijing
+:wq
+#sed 's/.//2' test.txt    删除所有行的第二个字符
+Hllo the world
+n hao ma beijing
+#sed 's/.$//' test.txt    删除所有行的最后一个字符
+Hello the worl
+ni hao ma beijin
+#sed 's/.//2;s/.$//' test.txt  将上面两个命令和二为一,两个命令用 ; 隔开
+Hllo the worl
+n hao ma beijin
+
+
+将每行第二个字符和倒数第二个字符对调
+#sed -r 's/^(.)(.)(.*)(.)(.)$/\1\4\3\2\5' test.txt   
+             1   2   3   4   5
+#sed 's/^\(.\)\(.\)\(.*\)\(.\)\(.\)$/\1\4\3\2\5/' test.txt
+
+
+
+ a:追加(后)
+ i:插入(前)
+ c:修改
+
+#vim 666.txt
+Hello the world
+ni hao me beijing
+#sed '2a XX' 666.txt  在文件里第二行后面一行(第三行)输入XX
+Hello the world
+ni hao ma beijing
+XX
+#sed '2i XX' 666.txt  在文件里第二行前面一行(第二行，原第二行变成第三行)输入XX
+Hello the world
+XX
+ni hao ma beijing
+#sed 'a  XX' 666.txt  在文件里第一行和第二行后面一行都插入XX
+Hello the world
+XX
+ni hao ma beijing
+XX
+#sed '2c XX' 666.txt  将文件的第二行改成XX
+Hello the world
+XX
+
+
+
+1.从/etc/passwd中找到bash结尾的用户名
+  #sed -r '/bash$/;s/:.*//' /etc/passwd
+
+
+     r:读取其他文件                                    _________                   _________
+     w:另存为                                          |   运行空间   |                   |回车          |
+     h:把运行空间的内容复制(覆盖)到保留空间里        |               |                   |   保留空间  | 
+     g:把保留空间的内容复制(覆盖)到运行空间里        ~~~~~~~~~~~~                    ~~~~~~~~~~~~
+     H:把运行空间的内容追加到保留空间里
+     G:把保留空间的内容追加到运行空间里(有空格)
+#vim test1.txt
+1
+2
+3
+4
+5
+6
+:wq
+#sed 'r /etc/hosts' test1.txt     把/etc/hosts的内容导入test.txt中
+1
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+2
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+3
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+4
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+5
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+6
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+#sed '1r /etc/hosts' test1.txt      把/etc/hosts的第一行导入test.txt中
+1
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+2
+3
+4
+5
+6
+#sed '2r /etc/hosts' test1.txt      把/etc/hosts的第二行导入test.txt中
+1
+2
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.25.254.254 classroom.example.com
+172.25.254.254 content.example.com
+3
+4
+5
+6
+#sed '1w /root/new.txt' test1.txt    把test.txt文件的第一行另存为/root/new.txt，new.txt不存在，会被创建出来
+1
+2
+3
+4
+5
+6
+#sed '2h;2g' test1.txt   
+1
+2
+3
+4
+5
+6
+#sed '2h;2G' test1.txt   
+1
+2
+2
+3
+4
+5
+6
+#sed '2H;2g' test1.txt   
+1
+
+2
+3
+4
+5
+6
+#sed '2H;2G' test1.txt  
+1
+2
+
+2
+3
+4
+5
+6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,233 @@
+Shellday01
+
+一、编写与执行shell脚本
+1.1什么是shell？  命令行解释器
+1.2什么是脚本？  实现某种功能的有执行权限的文件
+1.3怎么写shell脚本？ 
+vim 脚本名.sh
+#!/bin/bash
+功能代码
+:wq
+
+chmod +x 脚本名.sh
+
+
+
+1.4怎么执行shell脚本？
+
+划分新的资源给脚本运行
+./脚本名.sh
+/etc/init.d/脚本名.sh
+专属命令：
+sh /etc/init.d/脚本名.sh
+bash /etc/init.d/脚本名.sh
+
+不划分新的资源给脚本运行
+执行脚本时，不分配新的资源来执行脚本，而是占用当前终端的资源运行脚本。
+source /etc/init.d/脚本名.sh
+. /etc/init.d/脚本名.sh
+
+如：
+#vim /shell5/a.txt
+#!/bin/bash
+echo "abc"
+exit
+echo "qwe"
+:wq
+#sh /shell5/a.sh   运行这个命令给脚本新的资源来执行
+#abc     不会关闭终端
+#. /shell5/a.sh   运行这个命令给脚本不提供新的资源，使用运行命令的终端资源来执行
+        关闭运行命令的终端
+
+1.5 shell特性  支持快捷键，TAB健补齐，历史命令，命令别名，重定向，
+1.6如何查看系统支持的shell? /etc/shells
+
+只有用户自己登陆才能用的命令别名：写在用户的家目录/.bashrc
+                                    所有用户和管理员都可以用的/etc/bashrc
+
+在Linux内核与用户之间的解释器程序
+通常指/bin/bash
+负责内核翻译及传达用户/程序指令
+相当于操作系统的“外壳”
+
+把用户和程序命令翻译成二进制提供给内核，开始工作
+集成在内核里，壳
+查看shell解释器
+当前登陆的用户命令whoami  查看某个用户在使用的解释器的命令
+内置命令42+
+比如:useradd yaya
+     useradd -s /sbin/nologin jing 非交互的解释器/sbin/nologin
+
+修改记录历史命令的行数 /etc/profile 
+history     显示历史命令
+history -c  删除当前的历史命令
+
+标准输入        /dev/stdin         0     键盘
+标准输出        /dev/stdout        1    显示器
+标准错误输出    /dev/stderr        2    显示器
+
+重定向输入    <
+      输出     >
+               >>
+  错误输出    2>
+               2>>
+混合重定向    &>
+
+如：#cat <<eof
+>qwe
+>asd
+>eof
+qwe
+asd
+
+
+二、shell变量*（ps -l）
+2.1 什么是变量 
+  变化的数据
+2.2 定义变量 
+  变量名=值 （数字，字母区分大小写，下划线）
+2.3 变量的使用规则
+
+  变量赋值的时候等号两边不能有空格，
+  变量名不能纯数字，不能以数字开头，
+  当变量名相同时，后赋值生效
+
+2.4 使用变量
+  $变量名
+2.5 输出变量的值
+  echo $变量名 
+2.6查看已经定义的变量
+   env  查看系统环境变量不显示自己定义的变量
+   set  查看系统环境变量以及自己定义的变量
+2.7 销毁变量
+   unset  变量名
+2.8 shell变量类型   
+   系统环境变量： 系统启动时读取系统的配置文件或服务配置文件，定义的变量。
+                   变量名和存储是固定的，值会根据系统的运行环境和配置自动获取。
+                   写脚本时，可以直接使用系统环境变量，也可以修改系统环境变量，变量的名字一般以大写字母表示，
+         $PATH（所有使用的命令路径）   $PWD   $USER   $HOME   $HOSTNAME   $SHELL   $MAIL 
+   位置变量： /shell4/脚本名.sh	 $1  $2  $3 $4 $5 $6 $7 $8 $9 ${10} ${11}
+   预定义变量：/bin/bash 这种shell程序内置的变量，变量值是根据系统环境自动获取。
+                 $0：当前所在的脚本名或进程  $$：当前进程的PID  $?：上一次命令执行后的返回状态，0是成功，反则失败   $#：以加载位置变量的个数   
+                 $*：所有位置的值  
+                 $!：后台进程的PID
+   自定义变量： 编写脚本时，程序员根据程序的需要定义变量，定义变量时遵循变量的使用规则。
+                 编写脚本时，把变化的数据使用变量表示
+
+
+
+2.9给变量赋值的方式
+   普通赋值  x=19
+      如：#vim /shell4/2.sh
+          #!/bin/bash
+             dirname=name
+             mkdir /$dirname
+          :wq
+          #sh /shell4/2.sh 
+   从键盘接收数据给变量赋值  read   -p “提示信息” -t 等待时间（数字） 变量名
+      如：#vim /shell4/3.sh
+          #!/bin/bash
+             read -p "请输入学校的名称：  " -t 30 dirname   
+             read -p "请输入目录路径：  " -t  30 path
+                 mkdir   $path/$dirname
+          :wq
+          #sh /shell4/3.sh
+             请输入学校的名称         超过30s自动消失
+             请输入目录路径           超过30s自动消失
+              
+   使用一个变量给另一个变量赋值   
+       如： #ming=bai
+          #echo $ming
+          bai
+          #xing=pang
+          #echo $xing
+          pang
+          #fullname=${xing}bai$ming    容易出现不加{}的情况，没有$xingbai这个变量
+          pangbaibai  
+   累加赋值  变量自己给自己添加新值
+       如：#echo $PATH
+         /usr/lib64/qt-3.3:/usr/local/bin:/usr/loocal/sbin:/usr/bin:~~~~~~~
+         #PATH=/shell4:$PATH	(局部变量)
+         #echo $PATH
+         /shell4:/usr/lib64/qt-3.3/bin:~~~~~~~~~
+   获得命令的结果的赋值
+      变量名=$(命令字符串)
+     或变量名=`命令字符串`
+      如：#vim /shell4/7.sh
+        #!/bin/bash
+        day=$(date +%F)
+        week=`date +%u`
+        echo "今天的日期    $day"
+        echo "今天是星期$week"
+        :wq
+   变量的作用范围：在脚本中定义的变量只是在脚本执行过程中有效
+      用命令sh/bash运行脚本的时候，运行完成，内存中没有变量
+      用命令source/. 运行脚本的时候，运行完成，内存中有变量
+   全局变量：在当前shell和子shell里都可以使用
+       重启计算机才能用：（永久）
+        #vim /etc/profile
+        export PATH=/shell4:$PATH
+        :wq
+        #source /etc/profile
+       开启一个终端也能用：（永久）
+        #vim /etc/bashrc
+        export PATH=/shell4:$PATH
+        :wq
+  
+   局部变量：在当前shell
+   局部变量+export=全局变量
+     命令：export 变量名
+   全局变量：    export x 
+   取消全局变量：export -n x
+
+ 终端显示控制
+ 1.关闭终端输出（无显示）  stty -echo
+ 2.打开终端输出（显示）    stty echo
+
+快速创建YUM源的脚本
+#vim /shell4/auto_yum.sh
+#!/bin/bash
+mount /dev/cdrom /mnt
+rm -rf /etc/yum.repos.d/*.repo
+echo "[CentOS]" > /etc/yum.repos.d/nsd.repo
+echo "name=CentOS" >> /etc/yum.repos.d/nsd.repo
+echo "baseurl=file:///mnt" >> /etc/yum.repos.d/nsd.repo
+echo 'enabled=1' >> /etc/yum.repos.d/nsd.repo
+echo 'gpgcheck=0' >> /etc/yum.repos.d/nsd.repo
+:wq
+#chmod +x auto_yum.sh
+#yum cleam all
+#yum repolist
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

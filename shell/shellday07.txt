@@ -1,0 +1,182 @@
+shellday8
+
+awk  数据过滤
+   awk 选项 '条件{指令}'    文件
+     -F    自定义分隔符
+     -v    自定义变量
+指令：
+    无  默认全部打印(print)
+   print  $1 $2 $3 .....  $n   NF(列数) NR(行号)
+条件：
+    正则 //(对前行做正则)   $1~//(对某一列做正则)    $7!~//(对某一列取反正则)
+    数字或字符 == != > >= < <=
+    逻辑判断 && ||
+    算术运算 ++ -- += -= + - * / %
+
+
+awk公式(重点！！！！)
+ 
+ awk支持数组
+
+ 定义数组的格式：数组名[下标]=元素值
+ 调用数组的格式：数组名[下标]
+ 遍历数组的用法：for(变量 in 数组名){print 数组名[变量]}。
+
+ #awk 'BEGIN{a[0]=11;a[1]=88;print a[1],a[0]}'
+ #awk 'BEGIN{a++;print a}'
+ #awk 'BEGIN{a0++;print a}'
+ #awk 'BEGIN{a[0]++;print a}'
+ #awk 'BEGIN{a[0]=00;a[1]=11;a[2]=22;for(i in a){print i,a[i]}}'
+ #awk 
+
+
+在server0或者desktop0上
+#yum-y install httpd
+#systemcli restart httpd
+#firewall-cmd --set-default-zone=trusted
+#ll -h /var/log/httpd/access_log  httpd的日志
+
+DOS攻击
+#ab -c 100 -n 100000 http://172.25.0.11/
+模拟100人访问http://172.25.0.11/ 100000次
+#awk '{ip[$1]++}'
+#awk '{ip[$1]++} END{for(i in ip){print i,ip[i]}}' /var/log/httpd/access_log
+
+#awk '{ip[$1]++} END{for(i in ip){print ip[i,i]}}' /var/log/httpd/access_log | column -t | sort -n
+sort -n 数字按从小到大排序
+#awk '{ip[$1]++} END{for(i in ip){print ip[i],i}}' /var/log/httpd/access_log | column -t | sort -n | awk '$1>1000{print $2}' > ip.log
+for i in `seq ip.log`
+do
+   firewall-cmd --permanent --add-source=$i --zone=block 
+done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+get ftp://172.40.50.118/share/shell/nginx-1.8.0.tar.gz
+
+wget ftp://172.40.50.118/share/shell/day07.txt
+
+1.一键部署[nginx源码包,麻烦]
+vim test.sh
+	#!/bin/bash
+	tar -xf nginx-1.8.0.tar.gz
+	cd nginx-1.8.0
+	yum -y install gcc pcre-devel openssl-devel
+	./configure
+	make
+	make install
+
+验证: ls /usr/local/nginx/有内容
+
+++++++++++++++++++++++++++++++++++++++++++
+
+2.启动服务的脚本
+	刚刚安装的nginx,不受systemctl管理
+	启动: /usr/local/nginx/sbin/nginx[没提示,成功]
+	关闭:/usr/local/nginx/sbin/nginx -s stop
+	报错: Address already in use [把httpd关掉]
+	注意:同一个端口,用时不能被两个程序使用
+vim test.sh
+#!/bin/bash
+case $1 in
+start)
+		/usr/local/nginx/sbin/nginx;;
+stop)
+		/usr/local/nginx/sbin/nginx -s stop;;
+restart)
+		/usr/local/nginx/sbin/nginx -s stop
+		/usr/local/nginx/sbin/nginx;;
+status)
+		netstat -ntulp |grep nginx
+		判断是否启动:提示已经启动或已经关闭;;
+*)
+		echo Error;;
+esac
+
+#./test.sh status
+#./test.sh start
+#./test.sh stop
+#./test.sh restart
+#./test.sh  xxx
+
+
+++++++++++++++++++++++++++++++++++++++++
+3.监控脚本(awk过滤):
+		cpu负载:  uptime  2核CPU满值是2     uptime | awk  '{print $6,$7,$8,$9,$10}'
+                                     4核CPU满值是4
+		网卡流量:  ifconfig eth0   RX是接受的数据流量  ifconfig eth0 | awk '/RX p/{print $5}'
+						TX是发送出去的数据流量  ifconfig eth0 | awk '/TX p/{print $5}'
+		内存(Mem)剩余:free   free | awk '/Mem/{print $4}'
+		根分区的剩余容量:df    df | awk '/[/]$/{print $4}'
+		当前计算机的账户数量: wc -l /etc/passwd    
+		登陆了几个人:who   who | wc -l
+		当前开启的进程数量:  ps aux |wc -l
+		已经安装了多少软件: rpm -qa |wc -l
+
+#vim 
+#!/bin/bash
+
+++++++++++++++++++++++++++++++++++++++
+4.检查/var/log/secure看看有没有人尝试破解密码
+
+	awk '/Failed/{print $11}' /var/log/secure >> ip.txt
+	写一个防火墙规则,把她DROP
+	
++++++++++++++++++++++++++++++++++++++++++++
+5.写一个进度条脚本
+
+#!/bin/bash
+jindu(){
+while :
+do
+	echo -ne '\033[43m \033[0m'
+	sleep 0.3
+done
+}
+jindu &
+cp -r  $1  $2
+kill $!
+
+
+
+
+
+
+
+
+
+
+

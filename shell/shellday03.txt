@@ -1,0 +1,200 @@
+shellday03
+$[]运算完显示值
+let运算完不显示 需echo
+一个等于号是赋值，两个等于号是判断
+
+一、循环(for while)
+二、case判断
+三、函数
+四、中断
+
+
+for循环 固定次数的循环(给多少值循环多少次)
+语法格式
+for 变量名  in  值列表   变量在值列表中取值运行do命令，然后在取值运行do命令`````````
+do                    看值列表里有多少值，循环多少次
+   命令序列
+done
+如： 
+for 变量名 in 1 23 4 56 7 9
+do 
+   命令序列
+done
+
+for 变量名 in `ls /etc/*.conf`(命令的结果)
+do
+   命令序列
+done
+
+for 变量名 in {1..1000}(1到1000的所有数字)只对数字有用
+do
+   命令序列
+done
+
+for 变量名 in `seq 数字` 如：seq 50 从1还是每隔1个到50结束 1 2 3 4 5 6 7 8 9 ````  50
+do                        seq 2 1 50 从2开始每隔1个到50结束  2 3 4 5 6 ``````` 50
+  命令序列                       seq 2 2 50 从2开始每隔2个到50结束  2 4 6 8 10 ````````  50
+done
+
+
+ping -c 多少次
+     -i 多长时间ping一次
+     -W 等待对面回应的时间
+
+while循环
+语法格式：
+while 条件测试(不知道循环次数)判断一直为真，容易出现死循环(无限循环)，判断为假结束
+do
+  命令序列
+done
+如：
+i=1
+while [ $1 -le 5 ]
+do
+  echo dachi
+done
+这就是一个死循环，1永远小于5 
+i=1
+while [ $1 -le 5 ]
+do
+  echo dachi
+  let i++
+done
+这就不是一个死循环
+想做死循环,
+格式
+while :
+do
+   echo
+done
+
+case简化版的if
+格式：
+case 变量 in
+值1)
+   命令；；
+值2）
+   命令；；
+*）
+``````````
+esac
+
+
+
+shell函数：给你的一段代码取个别名,要用函数时直接函数名，直接在命令行输入
+格式：
+function 函数名{
+   命令序列 
+   ......
+}
+
+函数名(){
+   命令序列
+   ......
+}
+
+#mkcd(){
+>mkdir $1
+>cd $1
+>}
+
+echo -e "\033[32mOK\033[0m"
+echo -e "\033[32;43mOK\033[0m"
+echo -e扩展
+\33 颜色  
+32m 33m表示那个颜色
+OK输出的字符
+
+3x是字体色
+4x是北京色
+0x样式
+
+
+
+无限死循环：fork炸弹
+#vim test.sh
+.(){
+.|.&
+}
+.
+#chmod +x test.sh
+#./test.sh
+
+
+
+看多少人登陆自己的计算机
+ who然后看
+ who | wc -l
+
+发现超过5个人远程自己的计算机，发邮件给超管
+#vim /root/test.sh
+num=`who | wc -l`
+if [ $num -gt 5 ];then
+    mail -s 标题 root
+fi
+
+crontab -e
+* * * * * /root/test.sh
+
+
+#vim /shell1/10.sh
+for i in {1..254}
+do
+  ssh 192.168.4.$i shutdown
+done
+如果自己是其中一台机器（除非是254），只能关闭我自主机号之前的电脑，想让循环中断
+
+循环[for、while] 中断：
+continue：结束本次循环，进入下次循环
+break：结束整个循环
+exit：结束整个脚本
+
+如：
+for i in {1..5}
+do
+   [ $i -eq 3 ]&& continue
+    echo $1 (ssh 192.168.4.$1 shutdown)
+done
+
+i=1   1   (192.168.4.1关机)    屏幕输出结果：1 2 4 5
+i=2   2   (192.168.4.2关机)
+i=3    
+i=4   4   (192.168.4.4关机)
+i=5   5   (192.168.4.5关机)
+	
+for i in {1..5}
+do 
+  [ $1 -eq  3 ] && break
+   echo $1  (ssh 192.168.4.$1 shutdown)
+done
+   echo OK
+
+i=1  1   (192.168.4.1关机)    屏幕输出结果：1 2 OK
+i=2  2   (192.168.4.2关机)
+i=3  
+     OK
+
+for i in {1..5}          
+do 
+  [ $1 -eq  3 ] && exit
+   echo $1  (ssh 192.168.4.$1 shutdown)
+done
+   echo OK
+
+i=1 1   (192.168.4.1关机)      屏幕输出结果：1 2
+i=2 2   (192.168.4.2关机)
+i=3 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

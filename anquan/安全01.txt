@@ -69,10 +69,77 @@ bash: /etc/hosts: 权限不够
 允许wheel组成员以特权执行/usr/bin/下的命令
 为sudo机制启用日志记录，以便跟踪sudo执行操作
 
+使用su命令临时切换账户身份，并以root执行命令
+
+su(Substitute User)命令可以快速切换账户身份，普通用户切换账户身份时需要输入密码，root使用su命令切换任何身份都不需要密码，如法格式如下：
+# su –  [账户名称]
+# su -  [账户名称]  -c '命令'  
+1)从普通用户切换为root账户身份(如果没有普通账户则需要先创建)
+[jacob@svr5 ~]# whoami
+jacob
+[jacob@svr5 ~]# su –                    //切换账户，默认切换为root账户
+密码:
+[root@svr5 ~]# whoami                    //确认结果
+root
+2)以普通身份创建目录(如果没有普通账户则需要先创建)，以root身份重启服务
+[root@svr5 ~]# su - tom  -c "mkdir /home/tom/test"        //管理员切换普通用户
+[root@svr5 ~]# ll -d  /home/tom/test
+[tom@svr5 ~]# su - -c "systemctl restart sshd"            //以管理员重启服务
+密码：
+● sshd.service - OpenSSH server daemon
+Loaded: loaded (/usr/lib/systemd/system/sshd.service; enabled; vendor preset: enabled)
+active: active (running) since 五 2018-01-19 08:59:40 CST; 1 months 4 days ago
 
 
+允许softadm管理系统服务的权限
 
+1）修改/etc/sudoers配置
+修改/etc/sudoers可以直接使用vim编辑该文件，或使用visudo命令修改该文件。
+为softadm授予相关脚本的执行权限，允许通过systemctl工具来管理系统服务。
+如果没有softadm账户可以先创建该账户。
+[root@svr5 ~]# vim /etc/sudoers            //修改文件后，需要使用wq强制保存
+.. ..
+softadm    ALL=(ALL)   /usr/bin/systemctl         
+//授权softadm以root身份执行systemctl命令
+2）切换为softadm用户，并验证sudo执行权限
+[root@svr5 ~]# su – softadm
+[softadm@svr5 ~]$ sudo -l
+… …
+[sudo] password for softadm:                            //输入softadm的口令
+.. ..
+用户 softadm 可以在该主机上运行以下命令：
+    (ALL) /usr/bin/systemctl
+[softadm@svr5 ~]$ systemctl start httpd                    //不用sudo时启动服务失败
+Authentication is required
+.. ..
+[softadm@svr5 ~]$ sudo systemctl restart httpd          //通过sudo启动服务成功
 
+允许用户useradm通过sudo方式添加/删除/修改除root以外的用户账号
+
+1）修改/etc/sudoers配置
+为useradm授予用户管理相关命令的执行权限，例外程序以!符号取反，放在后面。在执行相关程序时，可以利用通配符*。
+[root@svr5 ~]# vim /etc/sudoers
+.. ..
+useradm ALL=(ALL)  /usr/bin/passwd,!/usr/bin/passwd root,/usr/sbin/user*,
+ !/usr/sbin/user* * root
+2）切换为useradm用户，验证sudo权限
+可以通过sudo方式来添加/删除/修改普通用户：
+[root@svr5 ~]# su – useradm
+[useradm@svr5 ~]$ sudo -l
+.. ..
+用户useradm可以在该主机上运行以下命令：
+    (root) /usr/bin/passwd, !/usr/bin/passwd root, /usr/sbin/user*,
+!/usr/sbin/user* * root
+[useradm@svr5 ~]$ sudo useradd newuser01                  //可以添加用户
+[useradm@svr5 ~]$ sudo passwd newuser01                  //可以修改普通用户的口令
+更改用户 newuser01 的密码 。
+新的 密码：
+重新输入新的 密码：
+passwd： 所有的身份验证令牌已经成功更新。
+但是不能修改root用户的密码：
+[useradm@svr5 ~]$ sudo passwd root
+对不起，用户 useradm 无权以 root 的身份在 localhost 上
+执行 /usr/bin/passwd root。
 
 
 
