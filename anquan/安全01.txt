@@ -1,0 +1,128 @@
+
+
+
+
+
+
+Linux基本防护措施
+
+修改用户zhangsan的账户属性，设置为2019-12-31日失效（禁止登录）
+
+1.正常情况下，未过期的账号可以正常登录，使用chage可以修改账户有效期。
+chage命令的语法格式：
+chage –l    账户名称                                //查看账户信息
+chage –E 时间 账户名称                            //修改账户有效期
+
+失效的用户将无法登录
+
+ 定义默认有效期（扩展知识）
+/etc/login.defs这个配置文件，决定了账户密码的默认有效期。
+[root@svr5 ~]# cat /etc/login.defs
+PASS_MAX_DAYS    99999                        //密码最长有效期
+PASS_MIN_DAYS    0                            //密码最短有效期
+PASS_MIN_LEN    5                            //密码最短长度
+PASS_WARN_AGE    7                            //密码过期前几天提示警告信息
+UID_MIN                  1000                //UID最小值
+UID_MAX                 60000                //UID最大值
+
+ 锁定用户账号
+ 使用passwd或usermod命令将用户lisi的账户锁定。
+[root@svr5 ~]# passwd -l lisi                           //锁定用户账号lock
+ 锁定用户 lisi 的密码。
+passwd: 操作成功
+[root@svr5 ~]# passwd -S lisi                          //查看状态status
+lisi LK 2018-02-22 0 99999 7 -1 (密码已被锁定。)
+验证用户lisi已无法登录，说明锁定生效
+ 输入正确的用户名、密码，始终提示“Login incorrect”，无法登录。
+
+
+锁定文件/etc/resolv.conf、/etc/hosts
+
+1）语法格式：
+# chattr +i  文件名                    //锁定文件（无法修改、删除等）
+# chattr -i  文件名                    //解锁文件
+# chattr +a  文件名                    //锁定后文件仅可追加
+# chattr -a  文件名                    //解锁文件
+# lsattr 文件名                        //查看文件特殊属性
+2) 使用+i锁定文件，使用lsattr查看属性
+[root@svr5 ~]# chattr +i /etc/resolv.conf /etc/hosts
+[root@svr5 ~]# lsattr /etc/resolv.conf /etc/hosts
+----i--------e- /etc/resolv.conf
+----i--------e- /etc/hosts
+2）测试文件锁定效果
+[root@svr5 ~]# rm -rf /etc/resolv.conf
+rm: 无法删除"/etc/resolv.conf": 不允许的操作
+[root@svr5 ~]# echo "192.168.4.1  gateway.tarena.com" >> /etc/hosts
+bash: /etc/hosts: 权限不够
+3）恢复这两个文件原有的属性（避免对后续实验造成影响）
+[root@svr5 ~]# chattr -i /etc/resolv.conf /etc/hosts
+[root@svr5 ~]# lsattr /etc/resolv.conf /etc/hosts
+-------------e- /etc/resolv.conf
+-------------e- /etc/hosts
+
+
+使用sudo分配管理权限
+
+使用su命令临时切换账户身份，并执行命令
+允许softadm管理系统服务的权限
+允许用户useradm通过sudo方式添加/删除/修改除root以外的用户账号
+允许wheel组成员以特权执行/usr/bin/下的命令
+为sudo机制启用日志记录，以便跟踪sudo执行操作
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
