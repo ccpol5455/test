@@ -254,6 +254,117 @@ PasswordAuthentication no                              //将此行yes改成no
 
 
 
+SELinux安全防护
+
+
+将Linux服务器的SELinux设为enforcing强制模式
+
+1）固定配置：修改/etc/selinux/config文件
+确认或修改SELINUX为enforcing模式：
+[root@svr5 ~]# vim /etc/selinux/config
+SELINUX=enforcing                                //设置SELinux为强制模式
+SELINUXTYPE=targeted                            //保护策略为保护主要的网络服务安全
+
+2）临时配置：使用setenforce命令
+查看当前SELinux状态，如果是disabled则需要根据第1）步的配置重启系统；如果是permissive则使用setenforce命令修改为enforcing即可：
+[root@svr5 ~]# getenforce                        //查看当前状态为警告模式
+Permissive
+[root@svr5 ~]# setenforce 1                      //设置SELinux为强制模式
+[root@svr5 ~]# getenforce                        //查看当前模式为强制模式
+Enforcing
+[root@svr5 ~]# setenforce 0                      //设置SELinux为强制模式
+[root@svr5 ~]# getenforce                        //查看当前模式为警告模式
+Permissive
+
+在SELinux启用状态下，调整策略打开vsftpd服务的匿名上传访问
+
+1）配置一个允许匿名上传的vsftpd服务作为测试环境
+[root@svr5 ~]# yum –y install vsftpd
+.. ..
+[root@svr5 ~]# vim /etc/vsftpd/vsftpd.conf
+anonymous_enable=YES                                  //开启匿名访问
+write_enable=YES
+anon_upload_enable=YES                              //允许上传文件
+anon_mkdir_write_enable=YES                          //允许上传目录
+[root@svr5 ~]# systemctl start vsftpd                //启动服务
+//默认Vsftpd共享目录为/var/ftp/
+
+从/root目录下移动2个包文件到FTP下载目录，调整文件的安全上下文
+
+1）建立两个FTP下载用的测试文件
+由root用户创建两个测试压缩包，一个直接建立到/var/ftp/目录下，另一个先在/root/下建立，然后移动至/var/ftp/目录。
+//测试文件1，直接在ftp目录下创建文件
+[root@svr5 ~]# tar –czf  /var/ftp/log1.tar  /var/log
+[root@svr5 ~]# mv log1.tar /var/ftp/
+[root@svr5 ~]# ls -lh /var/ftp/
+-rw-r--r--. 1 root root 8M 8月  16 10:16 log1.tar
+[root@svr5 ~]# ls -Z /var/ftp/
+-rw-r--r--. root root unconfined_u:object_r:public_content_t:s0 log1.tar
+//测试文件2，在/root下建立，然后移动至/var/ftp目录
+[root@svr5 ~]# tar –czf  log2.tar  /var/log
+[root@svr5 ~]# mv log2.tar /var/ftp/
+[root@svr5 ~]# ls -lh /var/ftp/
+-rw-r--r--. 1 root root 8M 8月  16 10:16 log2.tar
+[root@svr5 ~]# ls -lZ /var/ftp/
+-rw-r--r--. 1 root root unconfined_u:object_r:admin_home_t:s0 log2.tar
+3）通过FTP方式测试下载
+使用wget命令分别下载这两个包文件，第二个包将会下载失败（看不到文件）。
+[root@svr5 ~]# wget ftp://192.168.4.5/log1.tar            //下载第一个文件，成功
+[root@svr5 ~]# wget ftp://192.168.4.5/log2.tar            //下载第二个文件，失败
+4）检查该测试包的安全上下文，正确调整后再次下载第二个包成功。
+文件已经存放到共享目录下，但客户端无法访问下载，是因为被SELinux拦截了！
+[root@svr5 ~]# ls -lZ /var/ftp/
+-rw-r--r--. root root unconfined_u:object_r:public_content_t:s0 log1.tar
+-rw-r--r--. 1 root root unconfined_u:object_r:admin_home_t:s0   log2.tar
+[root@svr5 ~]# chcon -t public_content_t /var/ftp/d2.tar.gz
+[root@svr5 ~]# ls -Z /var/ftp/lo2.tar
+-rw-r--r--. root root unconfined_u:object_r:public_content_t:s0 log2.tar
+[root@svr5 ~]# wget ftp://192.168.4.5/log2.tar            //再次下载，成功
+
+注意：上例中的chcon操作可替换为（效果相同）：
+# restorecon /var/ftp/d2.tar.gz
+或者
+# chcon --reference=/var/ftp/d1.tar.gz /var/ftp/d2.tar.gz
+2）启用SELinux时验证FTP上传访问
+在targeted策略的布尔值设置中，默认禁止FTP匿名写入和完全访问：
+[root@client ~]# ls > test.txt
+[root@client ~]# ftp 192.168.4.5
+.. ..
+Name (192.168.4.7:root): ftp                    //使用匿名账户ftp登陆
+331 Please specify the password.
+Password:                                        //密码为空（回车即可）
+ftp> cd pub                                                //切换共享目录
+250 Directory successfully changed.
+ftp> put test.txt                                            //尝试上传测试文件
+local: test.txt remote: test.txt
+227 Entering Passive Mode (192,168,4,5,121,146).
+553 Could not create file.                                  //上传失败
+ftp> quit
+221 Goodbye.
+3）调整与FTP相关的SELinux布尔值，开放上传写入权限
+检查与allow_ftpd相关的SELinux布尔值，如果是off，则将其修改为on：
+[root@svr5 ~]# getsebool -a |grep allow_ftpd                  //查看布尔值
+allow_ftpd_anon_write --> off
+allow_ftpd_full_access --> off
+.. .
+[root@svr5 ~]# setsebool  -P  allow_ftpd_anon_write=1          //设置布尔值
+[root@svr5 ~]# setsebool  -P  allow_ftpd_full_access=1
+[root@svr5 ~]# getsebool -a |grep allow_ftpd                  //确认修改结果
+allow_ftpd_anon_write --> on
+allow_ftpd_full_access --> on
+4）再次访问vsftpd服务，经测试发现匿名上传已经可用
+[root@client ~]# ftp 192.168.4.5
+.. ..
+Name (192.168.4.5:root): ftp
+331 Please specify the password.
+Password:
+ftp> cd pub
+250 Directory successfully changed.
+ftp> put test.txt                                            //尝试上传测试文件
+226 Transfer complete.                                      //上传成功
+237 bytes sent in 6.3e-05 secs (3761.90 Kbytes/sec)
+ftp> quit
+221 Goodbye.
 
 
 
