@@ -1,0 +1,300 @@
+
+
+
+
+
+
+Linux基本防护措施
+
+修改用户zhangsan的账户属性，设置为2019-12-31日失效（禁止登录）
+
+1.正常情况下，未过期的账号可以正常登录，使用chage可以修改账户有效期。
+chage命令的语法格式：
+chage –l    账户名称                                //查看账户信息
+chage –E 时间 账户名称                            //修改账户有效期
+
+失效的用户将无法登录
+
+ 定义默认有效期（扩展知识）
+/etc/login.defs这个配置文件，决定了账户密码的默认有效期。
+[root@svr5 ~]# cat /etc/login.defs
+PASS_MAX_DAYS    99999                        //密码最长有效期
+PASS_MIN_DAYS    0                            //密码最短有效期
+PASS_MIN_LEN    5                            //密码最短长度
+PASS_WARN_AGE    7                            //密码过期前几天提示警告信息
+UID_MIN                  1000                //UID最小值
+UID_MAX                 60000                //UID最大值
+
+ 锁定用户账号
+ 使用passwd或usermod命令将用户lisi的账户锁定。
+[root@svr5 ~]# passwd -l lisi                           //锁定用户账号lock
+ 锁定用户 lisi 的密码。
+passwd: 操作成功
+[root@svr5 ~]# passwd -S lisi                          //查看状态status
+lisi LK 2018-02-22 0 99999 7 -1 (密码已被锁定。)
+验证用户lisi已无法登录，说明锁定生效
+ 输入正确的用户名、密码，始终提示“Login incorrect”，无法登录。
+
+
+锁定文件/etc/resolv.conf、/etc/hosts
+
+1）语法格式：
+# chattr +i  文件名                    //锁定文件（无法修改、删除等）
+# chattr -i  文件名                    //解锁文件
+# chattr +a  文件名                    //锁定后文件仅可追加
+# chattr -a  文件名                    //解锁文件
+# lsattr 文件名                        //查看文件特殊属性
+2) 使用+i锁定文件，使用lsattr查看属性
+[root@svr5 ~]# chattr +i /etc/resolv.conf /etc/hosts
+[root@svr5 ~]# lsattr /etc/resolv.conf /etc/hosts
+----i--------e- /etc/resolv.conf
+----i--------e- /etc/hosts
+2）测试文件锁定效果
+[root@svr5 ~]# rm -rf /etc/resolv.conf
+rm: 无法删除"/etc/resolv.conf": 不允许的操作
+[root@svr5 ~]# echo "192.168.4.1  gateway.tarena.com" >> /etc/hosts
+bash: /etc/hosts: 权限不够
+3）恢复这两个文件原有的属性（避免对后续实验造成影响）
+[root@svr5 ~]# chattr -i /etc/resolv.conf /etc/hosts
+[root@svr5 ~]# lsattr /etc/resolv.conf /etc/hosts
+-------------e- /etc/resolv.conf
+-------------e- /etc/hosts
+
+
+使用sudo分配管理权限
+
+使用su命令临时切换账户身份，并执行命令
+允许softadm管理系统服务的权限
+允许用户useradm通过sudo方式添加/删除/修改除root以外的用户账号
+允许wheel组成员以特权执行/usr/bin/下的命令
+为sudo机制启用日志记录，以便跟踪sudo执行操作
+
+使用su命令临时切换账户身份，并以root执行命令
+
+su(Substitute User)命令可以快速切换账户身份，普通用户切换账户身份时需要输入密码，root使用su命令切换任何身份都不需要密码，如法格式如下：
+# su –  [账户名称]
+# su -  [账户名称]  -c '命令'  
+1)从普通用户切换为root账户身份(如果没有普通账户则需要先创建)
+[jacob@svr5 ~]# whoami
+jacob
+[jacob@svr5 ~]# su –                    //切换账户，默认切换为root账户
+密码:
+[root@svr5 ~]# whoami                    //确认结果
+root
+2)以普通身份创建目录(如果没有普通账户则需要先创建)，以root身份重启服务
+[root@svr5 ~]# su - tom  -c "mkdir /home/tom/test"        //管理员切换普通用户
+[root@svr5 ~]# ll -d  /home/tom/test
+[tom@svr5 ~]# su - -c "systemctl restart sshd"            //以管理员重启服务
+密码：
+● sshd.service - OpenSSH server daemon
+Loaded: loaded (/usr/lib/systemd/system/sshd.service; enabled; vendor preset: enabled)
+active: active (running) since 五 2018-01-19 08:59:40 CST; 1 months 4 days ago
+
+
+允许softadm管理系统服务的权限
+
+1）修改/etc/sudoers配置
+修改/etc/sudoers可以直接使用vim编辑该文件，或使用visudo命令修改该文件。
+为softadm授予相关脚本的执行权限，允许通过systemctl工具来管理系统服务。
+如果没有softadm账户可以先创建该账户。
+[root@svr5 ~]# vim /etc/sudoers            //修改文件后，需要使用wq强制保存
+.. ..
+softadm    ALL=(ALL)   /usr/bin/systemctl         
+//授权softadm以root身份执行systemctl命令
+2）切换为softadm用户，并验证sudo执行权限
+[root@svr5 ~]# su – softadm
+[softadm@svr5 ~]$ sudo -l
+… …
+[sudo] password for softadm:                            //输入softadm的口令
+.. ..
+用户 softadm 可以在该主机上运行以下命令：
+    (ALL) /usr/bin/systemctl
+[softadm@svr5 ~]$ systemctl start httpd                    //不用sudo时启动服务失败
+Authentication is required
+.. ..
+[softadm@svr5 ~]$ sudo systemctl restart httpd          //通过sudo启动服务成功
+
+允许用户useradm通过sudo方式添加/删除/修改除root以外的用户账号
+
+1）修改/etc/sudoers配置
+为useradm授予用户管理相关命令的执行权限，例外程序以!符号取反，放在后面。在执行相关程序时，可以利用通配符*。
+[root@svr5 ~]# vim /etc/sudoers
+.. ..
+useradm ALL=(ALL)  /usr/bin/passwd,!/usr/bin/passwd root,/usr/sbin/user*,
+ !/usr/sbin/user* * root
+2）切换为useradm用户，验证sudo权限
+可以通过sudo方式来添加/删除/修改普通用户：
+[root@svr5 ~]# su – useradm
+[useradm@svr5 ~]$ sudo -l
+.. ..
+用户useradm可以在该主机上运行以下命令：
+    (root) /usr/bin/passwd, !/usr/bin/passwd root, /usr/sbin/user*,
+!/usr/sbin/user* * root
+[useradm@svr5 ~]$ sudo useradd newuser01                  //可以添加用户
+[useradm@svr5 ~]$ sudo passwd newuser01                  //可以修改普通用户的口令
+更改用户 newuser01 的密码 。
+新的 密码：
+重新输入新的 密码：
+passwd： 所有的身份验证令牌已经成功更新。
+但是不能修改root用户的密码：
+[useradm@svr5 ~]$ sudo passwd root
+对不起，用户 useradm 无权以 root 的身份在 localhost 上
+执行 /usr/bin/passwd root。
+
+
+
+
+
+提高SSH服务安全
+
+配置基本安全策略（禁止root、禁止空口令）
+针对SSH访问采用仅允许的策略，未明确列出的用户一概拒绝登录
+实现密钥验证登录（私钥口令）、免密码登入
+确认密钥验证使用正常后，禁用口令验证
+
+配置基本安全策略
+
+1）调整sshd服务配置，并重载服务
+[root@svr5 ~]# vim /etc/ssh/sshd_config
+.. ..
+Protocol 2                                          //去掉SSH协议V1
+PermitRootLogin no                                  //禁止root用户登录
+PermitEmptyPasswords no                              //禁止密码为空的用户登录
+UseDNS  no                                          //不解析客户机地址
+LoginGraceTime  1m                                  //登录限时
+MaxAuthTries  3                                      //每连接最多认证次数
+.. ..
+[root@svr5 ~]# systemctl restart sshd
+2）测试基本安全策略
+尝试以root用户SSH登录，失败：
+[root@svr5 ~]# ssh root@192.168.4.7
+root@192.168.4.7's password:
+Permission denied, please try again.
+将服务器上用户kate(如无该账户则先创建)的密码设为空，尝试SSH登录，也会失败：
+[root@svr5 ~]# passwd -d kate                          //清空用户口令
+清除用户的密码 kate。
+passwd: 操作成功
+[root@svr5 ~]# ssh kate@192.168.4.7
+kate@192.168.4.7's password:
+Permission denied, please try again.
+
+针对SSH访问采用仅允许的策略，未明确列出的用户一概拒绝登录
+
+1）调整sshd服务配置，添加AllowUsers策略，仅允许用户zengye、john、useradm，其中useradm只能从网段192.168.4.0/24登录。
+[root@svr5 ~]# vim /etc/ssh/sshd_config
+.. ..
+AllowUsers zengye john useradm@192.168.4.0/24            //定义账户白名单
+##DenyUsers  USER1  USER2                                //定义账户黑名单
+##DenyGroups  GROUP1 GROUP2                            //定义组黑名单
+##AllowGroups  GROUP1 GROUP2                            //定义组白名单
+[root@svr5 ~]# systemctl restart sshd
+2）验证SSH访问控制，未授权的用户将拒绝登录。
+[root@pc205 ~]# ssh useradm@192.168.4.5                  //已授权的用户允许登录
+useradm@192.168.4.5's password:
+[useradm@svr5 ~]$ exit
+[root@pc205 ~]# ssh zhangsan@192.168.4.5                  //未授权的用户被拒绝登录
+zhangsan@192.168.4.5's password:
+Permission denied, please try again.
+
+实现密钥对验证登录（私钥口令）、免密码登入
+
+1）准备客户机测试环境
+为客户机的用户root建立SSH密钥对
+使用ssh-keygen创建密钥对，将私钥口令设为空（直接回车）：
+[root@client ~]$ ssh-keygen -t rsa
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):
+Created directory '/root/.ssh'.
+Enter passphrase (empty for no passphrase):              //直接回车将口令设为空
+Enter same passphrase again:                              //再次回车确认
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+63:6e:cf:45:f0:56:e2:89:6f:62:64:5a:5e:fd:68:d2
+The key's randomart image is:
++--[ RSA 2048]----+
+|                 |
+|                 |
+|          . . .  |
+|           = =   |
+|        S = B .  |
+|       o B = . o |
+|        + + = E .|
+|       . + + o   |
+|          o      |
++-----------------+
+[root@client ~]$ ls -lh ~/.ssh/id_rsa*                  //确认密钥对文件
+-rw-------. 1 root root 1.8K 8月  15 10:35 /root/.ssh/id_rsa
+-rw-r--r--. 1 root root  403 8月  15 10:35 /root/.ssh/id_rsa.pub
+2）将客户机上用户root的公钥部署到SSH服务器
+以用户root登入客户机，使用ssh-copy-id命令将自己的公钥部署到服务器：
+[root@client ~]$ ssh-copy-id root@192.168.4.5
+root@192.168.4.5's password:
+Now try logging into the machine, with "ssh 'root@192.168.4.5'", and check in:
+  .ssh/authorized_keys
+to make sure we haven't added extra keys that you weren't expecting.
+3）在服务器上确认客户机用户root上传的公钥信息
+默认部署位置为目标用户的家目录下 ~/.ssh/authorized_keys文件：
+[root@svr5 ~]# tail -2 ~/.ssh/authorized_keys
+ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAzz+5AiFMGQ7LfuiV7eBnOcmRO9JRTcqRoynGO2y5
+RyFL+LxR1IpEbkNrUyIZDk5uaX1Y8rwsf+pa7UZ2NyqmUEvNSUo0hQyDGsU9SPyAdzRCCvDgwpOFhaHi/OFnT+zqjAqXH2M9fFYEVUU4PIVL8HT19zCQRVZ/q3acQA34UsQUR0PpLJAobsf1BLe2EDM8BsSHckDGsNoDT9vk+u3e83RaehBMuy1cVEN5sLAaIrIeyM8Q0WxQNlqknL908HRkTlTeKrRoHbMnOBFj8StwlnscKHlkrsKkhUf8A9WWz/vL4GDwGND5jdca3I2hdITAySjMdfL1HMHnMYOgMjPM0Q== root@192.168.4.100
+4）在客户机上测试SSH密钥对验证
+在客户机用户root的环境中，以远程用户root登入192.168.4.5主机时，无需验证口令即可登入（因为私钥口令为空）：
+[root@client ~]$ ssh root@192.168.4.5                      //免交互直接登入
+Last login: Thu Aug 15 10:48:09 2013 from 192.168.4.100
+
+确认密钥验证使用正常后，禁用口令验证
+
+1）调整sshd服务配置，将PasswordAuthentication设为no
+[root@svr5 ~]# vim /etc/ssh/sshd_config
+.. ..
+PasswordAuthentication no                              //将此行yes改成no
+[root@svr5 ~]# systemctl restart sshd
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

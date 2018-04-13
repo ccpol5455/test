@@ -1,0 +1,199 @@
+
+版本控制(subversion{svn},git)
+文件(代码)
+文件(配置文件)
+
+共享/var/ftp/a.txt
+
+#yum -y install subversion
+
+subversion是一个自由/开源的版本控制系统
+1.文件和目录可以超越时空
+2.允许你数据恢复到早期版本
+3.检查数据修改的历史
+4.允许你和比人协作文档并跟踪所做的修改
+
+客户端支持命令行和图形的访问
+通信方式：
+本地访问 file:///
+svn服务器 svn://
+web服务 用户直接用浏览器访问
+
+版本库：版本控制的核心  记录每一次改变
+客户端通过写数据库分享代码
+
+
+问题以及方案
+共享服务器(仓库)不能用ftp和smb来做
+锁定-修改-解锁的模型
+1.锁定可能导致管理问题 A锁定文件后忘记解锁等问题
+2.做定导致不必要的串行开发 A想修改一个文件的开始，B想修改一个文件的结尾
+                             如果能进行正确的合并，则可以更轻松的工作，没必要轮流工作
+
+拷贝-修改-合并的模型(svn)
+subversion控制系统使用的模型
+1.每个客户连接版本库，并建立个人工作副本
+2.用户并行工作，修改自己的副本
+3.最终，合并版本！
+4.个别冲突问题，需要人为手动解决
+
+
+Subversion基本操作
+
+安装Subversion服务器
+
+1）YUM安装subversion软件
+[root@web1 ~]# yum -y install subversion
+[root@web1 ~]# rpm -q subversion
+2)创建版本库
+[root@web1 ~]# mkdir /var/svn/ 
+[root@web1 ~]# svnadmin create /var/svn/project
+[root@web1 ~]# ls /var/svn/project/
+conf/  db/  format  hooks/  locks/  README.txt
+3）本地导入初始化数据
+[root@web1 ~]# cd /usr/lib/system/system/ 
+[root@web1 ~]# svn import . file:///var/svn/project/ -m "Init Data"
+4）修改配置文件，创建账户与密码
+[root@web1 ~]# vim /var/svn/project/conf/svnserve.conf
+[general]
+``````
+ unauthenticated
+
+anon-access = none        //匿名无任何权限
+auth-access = write        //有效账户可写
+
+password-db = passwd    //密码文件
+
+authz-db = authz        //ACL访问控制列表文件
+```````
+[root@web1 ~]# vim /var/svn/project/conf/passwd 
+… …
+[users]
+harry = pass            //用户名和密码
+tom = pass            //用户名和密码
+[root@web1 ~]# cat /var/svn/project/conf/authz 
+[aliases]
+# joe = /C=XZ/ST=Dessert/L=Snake City/O=Snake Oil, Ltd./OU=Research Institute/CN=Joe Average
+[groups]
+harry_and_tom = harry,tom            //定义组账户，组成员为harry和tom
+[/]                                //定义ACL访问控制
+harry = rw                        //用户对项目根路径可读可写
+tom = rw
+* = r                            //其他人只读
+5）启动服务
+[root@web1 ~]# svnserve –d  -r /var/svn/project1
+[root@web1 ~]# netstat -nutlp |grep svnserve
+tcp        0      0 0.0.0.0:3690    0.0.0.0:*    LISTEN      4043/svnserve       
+
+客户端测试(192.168.2.200)
+
+1）将服务器上的代码下载到本地
+[root@web2 ~]# cd /tmp
+[root@web2 ~]# svn --username harry --password pass \
+co svn://192.168.2.100/var/svn/project code        //建立本地副本
+-----------------------------------------------------------------------
+ATTENTION!  Your password for authentication realm:
+   <svn://127.0.0.1:3690> b72f45f0-bbe5-4a0c-ad4a-37f52704f0b1
+can only be stored to disk unencrypted!  You are advised to configure
+your system so that Subversion can store passwords encrypted, if
+possible.  See the documentation for details.
+You can avoid future appearances of this warning by setting the value
+of the 'store-plaintext-passwords' option to either 'yes' or 'no' in
+'/root/.subversion/servers'.
+-----------------------------------------------------------------------
+Store password unencrypted (yes/no)? yes            //提示是否保存密码
+[root@web2 ~]# cd /tmp/code
+[root@web2 code]# ls
+[root@web2 code]# vim user.slice                 //挑选任意文件修改其内容
+[root@web2 code]# svn ci –m "modify user"        //将本地修改的数据同步到服务器
+[root@web2 code]# svn update                    //将服务器上新的数据同步到本地
+[root@web2 code]# svn info     svn://192.168.2.100    //查看版本仓库基本信息
+[root@web2 code]# svn log     svn://192.168.2.100    //查看版本仓库的日志
+[root@web2 code]# echo "test" > test.sh        //本地新建一个文件
+[root@web2 code]# svn ci –m "new file"            //提交失败，该文件不被svn管理
+[root@web2 code]# svn add test.sh                //将文件或目录加入版本控制
+[root@web2 code]# svn ci –m "new file"            //再次提交，成功
+[root@web2 code]# svn mkdir subdir                //创建子目录
+[root@web2 code]# svn rm timers.target            //使用svn删除文件
+[root@web2 code]# svn ci –m "xxx"                //提交一次代码
+[root@web2 code]# vim umount.target            //任意修改本地的一个文件
+[root@web2 code]# svn diff                     //查看所有文件的差异
+[root@web2 code]# svn diff umount.target        //仅查看某一个文件的差异
+[root@web2 code]# svn cat svn://192.168.2.100/reboot.target    //查看服务器文件的内容
+[root@web2 code]# sed -i 'd' tmp.mount            //删除文件所有内容，但未提交
+[root@web2 code]# svn revert tmp.mount            //还原tmp.mount文件
+[root@web2 code]# rm –rf  *.target                //任意删除若干文件
+[root@web2 code]# svn update                    //还原
+[root@web2 code]# sed -i '1a ##test###' tuned.service    //修改本地副本中的代码文件
+[root@web2 code]# svn ci  -m  "xxx"                    //提交代码
+[root@web2 code]# svn merge –r7:2    tuned.service    //将文件从版本7还原到版本2
+
+
+svnserve -d -r /var/svn/project
+客户端访问svn://192.168.2.100/
+
+svnserve -d  或者 systemctl start svnserve
+客户端访问svn://192.168.2.100/
+
+
+svn co      下载代码
+svn ci      提交代码
+svn update  更新代码
+svn log     查看日志
+svn info    查看信息
+svn add     新建文件(svn管理的)
+svn mkdir   新建目录
+svn rm      删除文件
+svn diff    找本机那些文件和服务器上不同
+svn cat     查看服务器上的文件
+
+还原
+本机修改了,但没有提交 svn restart 文件名
+本机修改了,也提交了 svn merge -r7:2 tuned.service
+svn update
+
+多人操作：
+1.修改不同的文件
+2.修改相同的文件的相同行
+3.修改相同的文件的不同行
+
+1-------->
+修改不同的文件
+[root@web1 mycode]# sed -i "3a ###harry modify#####"  tmp.mount
+[root@web1 mycode]# svn ci -m  "has modified"
+[root@web2 mycode]# sed -i "3a ###tom modify#####"  umount.target
+[root@web2 mycode]# svn ci -m "has modified"
+[root@web2 mycode]# svn update
+[root@web1 mycode]# svn update
+
+使用dump指令备份版本库数据
+
+[root@web1 ~]# svnadmin dump /var/svn/project > project.bak  //备份
+[root@web1 ~]# svnadmin load /var/svn/project2 < project.bak      //还原
+
+
+制作nginx的RPM包
+RPM包：
+1.压缩包(源码安装的结果)
+2.描述信息
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

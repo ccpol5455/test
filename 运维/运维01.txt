@@ -1,0 +1,320 @@
+提前准备运维课程所有的所有虚拟机，为后续所有实验做准备，克隆4台RHEL7虚拟机，实验环境所需要的主机及对应的IP设置列表如表-1所示，正确配置IP地址、主机名称，并且为每台主机配置YUM源。
+
+clone-vm7
+ls -l /var/lib/libvirt/images/.rh7_template.img 
+-rw------- 1 qemu qemu 53695545344 1月  12 18:16 /var/lib/libvirt/images/.rh7_template.img
+  i权限：加上i权限，所有用户包括root都不能修改或删除该文件
+ lsattr /var/lib/libvirt/images/.rh7_template.img    #查看是否有特殊权限
+ chattr -i /var/lib/libvirt/images/.rh7_template.img   #去除特殊权限
+ chown qemu:qemu /var/lib/libvirt/images/.rh7_template.img
+ ls -l /var/lib/libvirt/images/.rh7_template.img 
+
+Client:eth0 192.168.4.100/24
+Proxy:eth0 192.168.4.5/24
+       eth1 192.168.2.5/24
+Web1:eth1 192.168.2.100/24
+Web2:eth1 192.168.2.200/24
+nmcli connection add con-name eth1 ifname eth1 type ethernet
+
+scp lnmp_sort.tar.gz 192.168.4.5:/root/
+
+互联网用的软件
+  Apache Nginx Tengine Lighttpd
+JAVA写的网站：Tomcat IBM WebSphere Jboss
+
+
+
+
+
+搭建Nginx服务器
+
+步骤一：构建Nginx服务器
+
+1）使用源码包安装nginx软件包
+[root@proxy ~]# yum –y install gcc pcre-devel openssl-devel        //安装依赖包
+[root@proxy ~]# useradd –s /sbin/nologin nginx
+[root@proxy ~]# tar  -xf   nginx-1.10.3.tar.gz
+[root@proxy ~]# cd  nginx-1.10.3
+[root@proxy nginx-1.10.3]# ./configure   \
+> --prefix=/usr/local/nginx   \                //指定安装路径
+> --user=nginx   \                            //指定用户
+> --group=nginx  \                            //指定组
+> --with-http_ssl_module                        //开启SSL加密功能
+[root@proxy nginx-1.10.3]# make && make install    //编译并安装
+
+2）nginx命令的用法
+[root@proxy ~]# /usr/local/nginx/sbin/nginx                    //启动服务
+[root@proxy ~]# /usr/local/nginx/sbin/nginx -s stop            //关闭服务
+[root@proxy ~]# /usr/local/nginx/sbin/nginx -s reload        //重新加载配置文件
+[root@proxy ~]# /usr/local/nginx/sbin/nginx –V                //查看软件信息
+[root@proxy ~]# ln -s /usr/local/nginx/sbin/nginx /sbin/        //方便后期使用
+
+nginx服务默认通过TCP 80端口监听客户端请求：
+[root@proxy ~]# netstat  -ntulp  |  grep nginx
+tcp        0        0 0.0.0.0:80        0.0.0.0:*        LISTEN        10441/nginx
+
+3）设置防火墙与SELinux
+[root@proxy ~]# firewall-cmd --set-default-zone=trusted
+[root@proxy ~]# setenforce 0
+
+4）测试首页文件
+Nginx Web服务默认首页文档存储目录为/usr/local/nginx/html/，在此目录下默认有一个名为index.html的文件，使用客户端访问测试页面：
+[root@client ~]# curl http://192.168.4.5
+<html>
+<head>
+<title>Welcome to nginx!</title>
+</head>
+<body bgcolor="white" text="black">
+<center><h1>Welcome to nginx!</h1></center>
+</body>
+</html>
+
+步骤二：升级Nginx服务器
+
+1）编译新版本nginx软件
+[root@proxy ~]# tar  -zxvf   nginx-1.12.2.tar.gz
+[root@proxy ~]# cd nginx-1.12.2
+[root@proxy nginx-1.12.2]# ./configure  --prefix=/usr/local/nginx   --user=nginx   --group=nginx  --with-http_ssl_module
+[root@proxy nginx-1.12.2]# make      
+
+
+2) 备份老的nginx主程序，并使用编译好的新版本nginx替换老版本
+[root@proxy nginx-1.12.2]# mv /usr/local/nginx/sbin/nginx  \
+>/usr/local/nginx/sbin/nginxold
+[root@proxy nginx-1.12.2]# cp objs/nginx  /usr/local/nginx/sbin/    //拷贝新版本
+[root@proxy nginx-1.12.2]# make upgrade                            //升级
+
+[root@proxy ~]# /usr/local/nginx/sbin/nginx –v                //查看版本
+
+安装程序
+tar
+./configure
+make
+make install(拷贝以下文件)
+conf         /usr/local/nginx/conf
+html         /usr/local/nginx/html
+             /usr/local/nginx/logs
+objs/nginx   /usr/local/nginx/sbin
+
+升级软件
+tar
+./configure
+make
+conf         /usr/local/nginx/conf(不变)
+html         /usr/local/nginx/html(不变)
+             /usr/local/nginx/logs(不变)
+objs/nginx   /usr/local/nginx/sbin
+mv 旧备份
+cp 新程序 /usr/local/nginx/sbin
+make upgrade
+
+
+配置文件：/usr/local/nginx/conf/nginx.conf
+全局配置（用户名，日志位置，启动多少进程``````````）
+
+进程：program  程序 放在硬盘上的就是程序，如:QQ安装到D盘了，叫QQ程序，快捷方式也叫程序
+     process  进程 在内存里的是进程，
+                       如:双击QQ运行，在内存里运行就叫QQ进程，
+                         双击打开360浏览器：在任务管理器中出现3个及更多的360se.exe，多进程并发让上网速度更快，内存占的很多
+     thread   线程 在进程下面开多个线程
+
+     nginx配置文件                                             http配置文件
+http{                                       
+   server{ (等于有一个虚拟主机)                  <VirtualHost *:80>
+      listen 80;                                 ServerName server0..example.com
+      server_name localhost;                     DocumentRoot /var/www/html
+      rool html;                              </VirtualHost>
+            }
+   server{ (等于有一个虚拟主机)                  <VirtualHost *:80>
+      listen 80;                                 ServerName server0..example.com
+      server_name localhost;                     DocumentRoot /var/www/html
+      rool html;                              </VirtualHost>
+            }
+     }
+
+
+
+步骤三：客户端访问测试
+
+1）分别使用浏览器和命令行工具curl测试服务器页面
+
+[root@client ~]# firefox http://192.168.4.5
+[root@client ~]# curl http://192.168.4.5
+
+
+
+
+案例2：用户认证
+
+
+步骤一：修改Nginx配置文件
+
+1）修改/usr/local/nginx/conf/nginx.conf
+[root@proxy ~]# vim /usr/local/nginx/conf/nginx.conf
+.. ..
+server {
+        listen       80;
+        server_name  localhost;
+        auth_basic "Input Password:";                        //认证提示符
+        auth_basic_user_file "/usr/local/nginx/pass";        //认证密码文件
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+  }
+
+
+2）生成密码文件，创建用户及密码
+使用htpasswd命令创建账户文件，需要确保系统中已经安装了httpd-tools。
+[root@proxy ~]# yum -y install  httpd-tools
+[root@proxy ~]# htpasswd -c(create) /usr/local/nginx/pass   tom    //创建密码文件
+New password: 
+Re-type new password: 
+Adding password for user tom
+[root@proxy ~]# htpasswd  /usr/local/nginx/pass   jerry    //追加用户，不使用-c选项
+New password: 
+Re-type new password: 
+Adding password for user jerry
+[root@proxy ~]# cat /usr/local/nginx/pass
+
+
+3）重启Nginx服务
+[root@proxy ~]# /usr/local/nginx/sbin/nginx –s reload    //重新加载配置文件    
+//请先确保nginx是启动状态才可以执行命令成功，否则报错
+
+
+步骤二：客户端测试
+
+1）登录192.168.4.100客户端主机进行测试
+[root@client ~]# firefox http://192.168.4.5                    //输入密码后可以访问
+
+
+1.安装的时候 --user=nginx 用nginx身份启动的程序，网络是开放的，黑客攻击你的程序就获得nginx身份的权限而不是root的
+
+2.用户认证   访问页面的用户  创建几个用户能用多少用户看网站
+
+QQ---->电脑()
+权限rwx------用户
+administrator---------->第一个
+管理员administrator/root------->双击QQ
+nginx--------->nginx
+
+
+
+案例3：基于域名的虚拟主机
+
+一台电脑，一个软件，作很多网络
+
+步骤一：修改配置文件
+
+1）修改Nginx服务配置，添加相关虚拟主机配置如下
+[root@proxy ~]# vim /usr/local/nginx/conf/nginx.conf
+.. ..
+server {
+        listen       80;                                      //端口
+        server_name  www.aa.com;                            //域名
+        auth_basic "Input Password:";                 //认证提示符
+        auth_basic_user_file "/usr/local/nginx/pass";        //认证密码文件
+location / {
+            root   html;                                    //指定网站根路径
+            index  index.html index.htm;
+       }
+       
+}
+… …
+    server {
+        listen  80;                                        //端口
+        server_name  www.bb.com;                            //域名
+location / { 
+root   www;                                 //指定网站根路径
+index  index.html index.htm;
+}
+}
+
+2）创建网站根目录及对应首页文件
+[root@proxy ~]# mkdir /usr/local/nginx/www
+[root@proxy ~]# echo "www" > /usr/local/nginx/www/index.html
+
+3）重启nginx服务
+[root@proxy ~]# /usr/local/nginx/sbin/nginx –s reload
+
+
+
+步骤二：客户端测试
+
+1）修改客户端主机192.168.4.100的/etc/hosts文件，进行域名解析
+[root@client ~]# vim /etc/hosts
+192.168.4.5    www.aa.com  www.bb.com
+
+2）登录192.168.4.100客户端主机进行测试
+注意：请先关闭真实机的firefox，SSH –X远程连接调用虚拟机的firefox。
+[root@client ~]# firefox http://www.aa.com            //输入密码后可以访问
+[root@client ~]# firefox http://www.bb.com            //直接访问
+
+
+http协议明文
+http+ssl=https://加密
+
+
+案例4：SSL虚拟主机
+
+加密算法一般分为对称算法、非对称算法、信息摘要。
+对称算法有：AES、DES，主要应用在单机数据加密。
+非对称算法有：RSA、DSA，主要应用在网络数据加密。
+信息摘要：MD5、sha256，主要应用在数据完整性校验、数据秒传等。
+
+步骤一：配置SSL虚拟主机
+1）生成私钥与证书
+[root@proxy ~]# cd /usr/local/nginx/conf
+[root@proxy ~]# openssl genrsa > cert.key                            //生成私钥
+[root@proxy ~]# openssl req -new -x509 -key cert.key > cert.pem      //生成证书
+                     国家 地区  城市  公司  你的名字  
+2）修改Nginx配置文件，设置加密网站的虚拟主机
+[root@proxy ~]# vim  /usr/local/nginx/conf/nginx.conf
+… …    
+server {
+        listen       443 ssl;
+        server_name            www.cc.com;
+        ssl_certificate      cert.pem;
+        ssl_certificate_key  cert.key;
+        ssl_session_cache    shared:SSL:1m;
+        ssl_session_timeout  5m;
+        ssl_ciphers  HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers  on;
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+
+
+
+步骤二：客户端验证
+1）修改客户端主机192.168.4.100的/etc/hosts文件，进行域名解析
+[root@client ~]# vim /etc/hosts
+192.168.4.5    www.cc.com  www.aa.com   www.bb.com
+
+2）登录192.168.4.100客户端主机进行测试
+[root@client ~]# firefox https://www.cc.com            //信任证书后可以访问
+
+
+
+模块【现代化软件，设计的都是模块化的软件】
+设计100【写完】
+  安装是根据自己的需要，自定义安装
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
